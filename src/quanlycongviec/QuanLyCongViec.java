@@ -1,44 +1,47 @@
 package quanlycongviec;
 
-import java.io.*;
 import java.util.*;
-import java.text.SimpleDateFormat;
-import java.text.ParseException;
 
 public class QuanLyCongViec {
-    private List<CongViec> danhSach = new ArrayList<>();
-    private static final String FILE_NAME = "congviec.csv";
-    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
+    private DatabaseHelper dbHelper;
 
+    public QuanLyCongViec() {
+        dbHelper = new DatabaseHelper();
+    }
+
+    // Lấy danh sách công việc (bao gồm cả subtask)
     public List<CongViec> getDanhSach() {
-        return danhSach;
+        List<DatabaseHelper.CongViecWithId> list = dbHelper.getAllCongViec();
+        List<CongViec> result = new ArrayList<>();
+        for (DatabaseHelper.CongViecWithId c : list) {
+            result.add(c.cv);
+        }
+        return result;
     }
 
-    public void themCongViec(CongViec cv) {
-        if (cv == null) {
-            System.out.println("Không thể thêm công việc null!");
-            return;
-        }
-        if (kiemTraNgayHopLe(cv.getHanChot())) {
-            danhSach.add(cv);
-            System.out.println("Đã thêm công việc thành công!");
-        } else {
-            System.out.println("Ngày không hợp lệ! Vui lòng nhập theo định dạng dd/MM/yyyy");
-        }
+    // Thêm công việc chính (trả về id mới)
+    public int themCongViec(CongViec cv) {
+        return dbHelper.insertCongViec(cv, null);
     }
 
-    public void xoaCongViec(int index) {
-        if (index >= 0 && index < danhSach.size()) {
-            danhSach.remove(index);
-            System.out.println("Đã xóa công việc thành công!");
-        } else {
-            System.out.println("Vị trí không hợp lệ!");
-        }
+    // Thêm subtask (trả về id mới)
+    public int themSubTask(CongViec sub, int parentId) {
+        return dbHelper.insertCongViec(sub, parentId);
+    }
+
+    // Cập nhật công việc (cần truyền id)
+    public void capNhatCongViec(int id, CongViec cv) {
+        dbHelper.updateCongViec(id, cv);
+    }
+
+    // Xóa công việc (và subtask nếu là cha)
+    public void xoaCongViec(int id) {
+        dbHelper.deleteCongViec(id);
     }
 
     public void danhDauHoanThanh(int index) {
-        if (index >= 0 && index < danhSach.size()) {
-            CongViec cv = danhSach.get(index);
+        if (index >= 0 && index < getDanhSach().size()) {
+            CongViec cv = getDanhSach().get(index);
             cv.setHoanThanh(!cv.isHoanThanh());
             System.out.println("Đã cập nhật trạng thái công việc!");
         } else {
@@ -48,11 +51,11 @@ public class QuanLyCongViec {
 
     public List<CongViec> timKiem(String tuKhoa) {
         if (tuKhoa == null || tuKhoa.trim().isEmpty()) {
-            return new ArrayList<>(danhSach);
+            return new ArrayList<>(getDanhSach());
         }
         List<CongViec> ketQua = new ArrayList<>();
         tuKhoa = tuKhoa.toLowerCase().trim();
-        for (CongViec cv : danhSach) {
+        for (CongViec cv : getDanhSach()) {
             if ((cv.getTieuDe() != null && cv.getTieuDe().toLowerCase().contains(tuKhoa)) ||
                 (cv.getMoTa() != null && cv.getMoTa().toLowerCase().contains(tuKhoa)) ||
                 (cv.getNguoiThucHien() != null && cv.getNguoiThucHien().toLowerCase().contains(tuKhoa)) ||
@@ -64,105 +67,15 @@ public class QuanLyCongViec {
     }
 
     public void hienThiDanhSach() {
-        if (danhSach.isEmpty()) {
+        if (getDanhSach().isEmpty()) {
             System.out.println("Danh sách công việc trống!");
             return;
         }
         System.out.println("\n=== DANH SÁCH CÔNG VIỆC ===");
-        for (int i = 0; i < danhSach.size(); i++) {
-            System.out.println((i + 1) + ". " + danhSach.get(i));
+        for (int i = 0; i < getDanhSach().size(); i++) {
+            System.out.println((i + 1) + ". " + getDanhSach().get(i));
         }
         System.out.println("===========================");
-    }
-
-    public void luuVaoFile() {
-        File file = new File(FILE_NAME);
-        try {
-            // Kiểm tra quyền ghi
-            if (file.exists() && !file.canWrite()) {
-                System.out.println("Không có quyền ghi vào file " + FILE_NAME);
-                return;
-            }
-            
-            // Tạo thư mục nếu chưa tồn tại
-            File parentDir = file.getParentFile();
-            if (parentDir != null && !parentDir.exists()) {
-                parentDir.mkdirs();
-            }
-
-            try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
-                // Lưu từng công việc chính
-                for (CongViec cv : danhSach) {
-                    writer.println(cv.toCSV());
-                    // Lưu tiếp các subtask nếu có
-                    for (CongViec sub : cv.getSubTasks()) {
-                        writer.println(sub.toCSV());
-                    }
-                }
-                System.out.println("Đã lưu vào file " + FILE_NAME);
-            }
-        } catch (IOException e) {
-            System.out.println("Lỗi khi lưu file: " + e.getMessage());
-        }
-    }
-
-    public void docTuFile() {
-        danhSach.clear();
-        File file = new File(FILE_NAME);
-        
-        // Nếu file không tồn tại, tạo file mới
-        if (!file.exists()) {
-            try {
-                file.createNewFile();
-                System.out.println("Đã tạo file mới " + FILE_NAME);
-                return;
-            } catch (IOException e) {
-                System.out.println("Không thể tạo file mới: " + e.getMessage());
-                return;
-            }
-        }
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            CongViec currentParent = null;
-            int lineNumber = 0;
-            
-            while ((line = reader.readLine()) != null) {
-                lineNumber++;
-                try {
-                    if (line.trim().isEmpty()) continue;
-                    
-                    CongViec cv = CongViec.fromCSV(line);
-                    if (!cv.isSubTask()) {
-                        // Task chính
-                        danhSach.add(cv);
-                        currentParent = cv;
-                    } else if (currentParent != null) {
-                        // Task con, gán vào cha gần nhất
-                        currentParent.addSubTask(cv);
-                    } else {
-                        System.out.println("Lỗi định dạng file: Task con không có task cha (dòng " + lineNumber + ")");
-                    }
-                } catch (Exception e) {
-                    System.out.println("Lỗi đọc dòng " + lineNumber + ": " + e.getMessage());
-                }
-            }
-        } catch (IOException e) {
-            System.out.println("Không thể đọc file: " + e.getMessage());
-        }
-    }
-
-    private boolean kiemTraNgayHopLe(String ngay) {
-        if (ngay == null || ngay.trim().isEmpty()) {
-            return false;
-        }
-        try {
-            dateFormat.setLenient(false);
-            dateFormat.parse(ngay.trim());
-            return true;
-        } catch (ParseException e) {
-            return false;
-        }
     }
 }
 

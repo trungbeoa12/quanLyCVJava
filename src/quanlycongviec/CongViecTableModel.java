@@ -6,7 +6,7 @@ import java.util.List;
 
 public class CongViecTableModel extends AbstractTableModel {
     // Cột 0: Nút expand/collapse hoặc STT
-    private final String[] columnNames = {"", "Tiêu đề", "Mô tả", "Hạn chót", "Trạng thái", "Ưu tiên", "Người thực hiện", "Ghi chú", "Đường dẫn"};
+    private final String[] columnNames = {"", "Tiêu đề", "Ngày tháng", "Mô tả", "Hạn chót", "Trạng thái", "Người thực hiện", "Ghi chú", "Đường dẫn"};
     // Danh sách công việc gốc (chỉ cha cấp 1)
     private List<CongViec> danhSachGoc;
     // Danh sách đã flatten theo expand/collapse (dùng để hiển thị)
@@ -79,10 +79,10 @@ public class CongViecTableModel extends AbstractTableModel {
                 } else {
                     return "● " + cv.getTieuDe();
                 }
-            case 2: return cv.getMoTa();
-            case 3: return cv.getHanChot();
-            case 4: return cv.isHoanThanh() ? "✓" : "✗";
-            case 5: return cv.getUuTien();
+            case 2: return cv.getNgayThang();
+            case 3: return cv.getMoTa();
+            case 4: return cv.getHanChot();
+            case 5: return cv.isHoanThanh() ? "✓" : "✗";
             case 6: return cv.getNguoiThucHien();
             case 7: return cv.getGhiChu();
             case 8: return cv.getDuongDan();
@@ -94,7 +94,7 @@ public class CongViecTableModel extends AbstractTableModel {
         return flattenedList.get(row).task;
     }
 
-    public int getLevelAt(int row) {
+    public int getLevelAt(int row) {    
         return flattenedList.get(row).level;
     }
 

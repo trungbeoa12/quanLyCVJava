@@ -3,17 +3,21 @@ package quanlycongviec;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.Date;
+import java.text.SimpleDateFormat;
 
 public class CongViecDialog extends JDialog {
-    private JTextField txtTieuDe, txtMoTa, txtHanChot, txtUuTien, txtNguoiThucHien, txtGhiChu, txtDuongDan;
+    private JTextField txtTieuDe, txtMoTa, txtNguoiThucHien, txtGhiChu, txtDuongDan;
+    private JSpinner spnNgayThang, spnHanChot;
     private JCheckBox chkHoanThanh;
     private boolean confirmed = false;
     private CongViec congViec;
+    private static final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
 
     public CongViecDialog(Frame parent, CongViec congViec) {
         super(parent, true);
         setTitle(congViec == null ? "Thêm công việc" : "Sửa công việc");
-        setSize(460, 430);
+        setSize(480, 470);
         setLocationRelativeTo(parent);
 
         JPanel panel = new JPanel(new GridBagLayout());
@@ -32,6 +36,15 @@ public class CongViecDialog extends JDialog {
         txtTieuDe = new JTextField();
         panel.add(txtTieuDe, gbc);
 
+        // Ngày tháng (calendar, bắt buộc)
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        panel.add(new JLabel("Ngày tháng:"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        spnNgayThang = new JSpinner(new SpinnerDateModel());
+        JSpinner.DateEditor dateEditorNgay = new JSpinner.DateEditor(spnNgayThang, "dd/MM/yyyy");
+        spnNgayThang.setEditor(dateEditorNgay);
+        panel.add(spnNgayThang, gbc);
+
         // Mô tả
         row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
         panel.add(new JLabel("Mô tả:"), gbc);
@@ -39,19 +52,14 @@ public class CongViecDialog extends JDialog {
         txtMoTa = new JTextField();
         panel.add(txtMoTa, gbc);
 
-        // Hạn chót
+        // Hạn chót (calendar, không bắt buộc)
         row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
-        panel.add(new JLabel("Hạn chót (dd/MM/yyyy):"), gbc);
+        panel.add(new JLabel("Hạn chót:"), gbc);
         gbc.gridx = 1; gbc.weightx = 1.0;
-        txtHanChot = new JTextField();
-        panel.add(txtHanChot, gbc);
-
-        // Ưu tiên
-        row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
-        panel.add(new JLabel("Ưu tiên:"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1.0;
-        txtUuTien = new JTextField();
-        panel.add(txtUuTien, gbc);
+        spnHanChot = new JSpinner(new SpinnerDateModel());
+        JSpinner.DateEditor dateEditorHanChot = new JSpinner.DateEditor(spnHanChot, "dd/MM/yyyy");
+        spnHanChot.setEditor(dateEditorHanChot);
+        panel.add(spnHanChot, gbc);
 
         // Người thực hiện
         row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
@@ -107,8 +115,20 @@ public class CongViecDialog extends JDialog {
         if (congViec != null) {
             txtTieuDe.setText(congViec.getTieuDe());
             txtMoTa.setText(congViec.getMoTa());
-            txtHanChot.setText(congViec.getHanChot());
-            txtUuTien.setText(congViec.getUuTien());
+            // Ngày tháng
+            try {
+                if (!congViec.getNgayThang().isEmpty()) {
+                    Date d = dateFormat.parse(congViec.getNgayThang());
+                    spnNgayThang.setValue(d);
+                }
+            } catch (Exception ex) {}
+            // Hạn chót
+            try {
+                if (!congViec.getHanChot().isEmpty()) {
+                    Date d = dateFormat.parse(congViec.getHanChot());
+                    spnHanChot.setValue(d);
+                }
+            } catch (Exception ex) {}
             txtNguoiThucHien.setText(congViec.getNguoiThucHien());
             txtGhiChu.setText(congViec.getGhiChu());
             chkHoanThanh.setSelected(congViec.isHoanThanh());
@@ -116,17 +136,29 @@ public class CongViecDialog extends JDialog {
         }
 
         btnOK.addActionListener(e -> {
-            if (txtTieuDe.getText().trim().isEmpty() || txtMoTa.getText().trim().isEmpty() || txtHanChot.getText().trim().isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Vui lòng nhập đầy đủ thông tin bắt buộc!");
+            if (txtTieuDe.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Vui lòng nhập tiêu đề!");
                 return;
             }
+            String ngayThangStr = "";
+            try {
+                ngayThangStr = dateFormat.format((Date) spnNgayThang.getValue());
+            } catch (Exception ex) {}
+            if (ngayThangStr.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Vui lòng chọn ngày tháng!");
+                return;
+            }
+            String hanChotStr = "";
+            try {
+                hanChotStr = dateFormat.format((Date) spnHanChot.getValue());
+            } catch (Exception ex) {}
             confirmed = true;
             this.congViec = new CongViec(
                 txtTieuDe.getText().trim(),
                 txtMoTa.getText().trim(),
-                txtHanChot.getText().trim(),
+                ngayThangStr,
+                hanChotStr,
                 chkHoanThanh.isSelected(),
-                txtUuTien.getText().trim(),
                 txtNguoiThucHien.getText().trim(),
                 txtGhiChu.getText().trim(),
                 txtDuongDan.getText().trim()
