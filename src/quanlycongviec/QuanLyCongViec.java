@@ -15,6 +15,10 @@ public class QuanLyCongViec {
     }
 
     public void themCongViec(CongViec cv) {
+        if (cv == null) {
+            System.out.println("Không thể thêm công việc null!");
+            return;
+        }
         if (kiemTraNgayHopLe(cv.getHanChot())) {
             danhSach.add(cv);
             System.out.println("Đã thêm công việc thành công!");
@@ -43,11 +47,16 @@ public class QuanLyCongViec {
     }
 
     public List<CongViec> timKiem(String tuKhoa) {
+        if (tuKhoa == null || tuKhoa.trim().isEmpty()) {
+            return new ArrayList<>(danhSach);
+        }
         List<CongViec> ketQua = new ArrayList<>();
-        tuKhoa = tuKhoa.toLowerCase();
+        tuKhoa = tuKhoa.toLowerCase().trim();
         for (CongViec cv : danhSach) {
-            if (cv.getTieuDe().toLowerCase().contains(tuKhoa) || 
-                cv.getMoTa().toLowerCase().contains(tuKhoa)) {
+            if ((cv.getTieuDe() != null && cv.getTieuDe().toLowerCase().contains(tuKhoa)) ||
+                (cv.getMoTa() != null && cv.getMoTa().toLowerCase().contains(tuKhoa)) ||
+                (cv.getNguoiThucHien() != null && cv.getNguoiThucHien().toLowerCase().contains(tuKhoa)) ||
+                (cv.getGhiChu() != null && cv.getGhiChu().toLowerCase().contains(tuKhoa))) {
                 ketQua.add(cv);
             }
         }
@@ -67,11 +76,31 @@ public class QuanLyCongViec {
     }
 
     public void luuVaoFile() {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(FILE_NAME))) {
-            for (CongViec cv : danhSach) {
-                writer.println(cv.toCSV());
+        File file = new File(FILE_NAME);
+        try {
+            // Kiểm tra quyền ghi
+            if (file.exists() && !file.canWrite()) {
+                System.out.println("Không có quyền ghi vào file " + FILE_NAME);
+                return;
             }
-            System.out.println("Đã lưu vào file " + FILE_NAME);
+            
+            // Tạo thư mục nếu chưa tồn tại
+            File parentDir = file.getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+
+            try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
+                // Lưu từng công việc chính
+                for (CongViec cv : danhSach) {
+                    writer.println(cv.toCSV());
+                    // Lưu tiếp các subtask nếu có
+                    for (CongViec sub : cv.getSubTasks()) {
+                        writer.println(sub.toCSV());
+                    }
+                }
+                System.out.println("Đã lưu vào file " + FILE_NAME);
+            }
         } catch (IOException e) {
             System.out.println("Lỗi khi lưu file: " + e.getMessage());
         }
@@ -79,10 +108,44 @@ public class QuanLyCongViec {
 
     public void docTuFile() {
         danhSach.clear();
-        try (BufferedReader reader = new BufferedReader(new FileReader(FILE_NAME))) {
+        File file = new File(FILE_NAME);
+        
+        // Nếu file không tồn tại, tạo file mới
+        if (!file.exists()) {
+            try {
+                file.createNewFile();
+                System.out.println("Đã tạo file mới " + FILE_NAME);
+                return;
+            } catch (IOException e) {
+                System.out.println("Không thể tạo file mới: " + e.getMessage());
+                return;
+            }
+        }
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
+            CongViec currentParent = null;
+            int lineNumber = 0;
+            
             while ((line = reader.readLine()) != null) {
-                danhSach.add(CongViec.fromCSV(line));
+                lineNumber++;
+                try {
+                    if (line.trim().isEmpty()) continue;
+                    
+                    CongViec cv = CongViec.fromCSV(line);
+                    if (!cv.isSubTask()) {
+                        // Task chính
+                        danhSach.add(cv);
+                        currentParent = cv;
+                    } else if (currentParent != null) {
+                        // Task con, gán vào cha gần nhất
+                        currentParent.addSubTask(cv);
+                    } else {
+                        System.out.println("Lỗi định dạng file: Task con không có task cha (dòng " + lineNumber + ")");
+                    }
+                } catch (Exception e) {
+                    System.out.println("Lỗi đọc dòng " + lineNumber + ": " + e.getMessage());
+                }
             }
         } catch (IOException e) {
             System.out.println("Không thể đọc file: " + e.getMessage());
@@ -90,12 +153,16 @@ public class QuanLyCongViec {
     }
 
     private boolean kiemTraNgayHopLe(String ngay) {
+        if (ngay == null || ngay.trim().isEmpty()) {
+            return false;
+        }
         try {
             dateFormat.setLenient(false);
-            dateFormat.parse(ngay);
+            dateFormat.parse(ngay.trim());
             return true;
         } catch (ParseException e) {
             return false;
         }
     }
 }
+

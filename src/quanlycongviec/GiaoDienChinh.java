@@ -2,8 +2,6 @@ package quanlycongviec;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.List;
@@ -13,17 +11,15 @@ public class GiaoDienChinh extends JFrame {
     private QuanLyCongViec ql;
     private JTable table;
     private CongViecTableModel tableModel;
-    private JTextField txtTieuDe, txtMoTa, txtHanChot, txtTimKiem;
-    private JButton btnThem, btnXoa, btnLuu, btnTimKiem, btnCapNhat, btnHuy;
+    private JTextField txtTimKiem;
+    private JButton btnThem, btnXoa, btnLuu, btnTimKiem;
     private JCheckBox chkHoanThanh, chkChuaHoanThanh;
-    private int editingRow = -1;
-    private TableRowSorter<DefaultTableModel> sorter;
 
     public GiaoDienChinh() {
         ql = new QuanLyCongViec();
         ql.docTuFile();
         setTitle("Quản Lý Công Việc");
-        setSize(1100, 600);
+        setSize(1200, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new GridBagLayout());
@@ -55,17 +51,34 @@ public class GiaoDienChinh extends JFrame {
         table.setFont(new Font("Arial", Font.PLAIN, 14));
         table.getTableHeader().setFont(new Font("Arial", Font.BOLD, 15));
         JScrollPane scrollPane = new JScrollPane(table);
-        // Renderer màu sắc cho trạng thái và ưu tiên
+
+        // Renderer cho cột tiêu đề
+        table.getColumnModel().getColumn(1).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                String text = (String) value;
+                if (text.startsWith("    ↳")) {
+                    // Công việc phụ: màu xanh lá
+                    c.setForeground(new Color(0, 128, 0));
+                    c.setFont(new Font("Arial", Font.ITALIC, 14));
+                } else {
+                    // Công việc chính: màu đen đậm
+                    c.setForeground(Color.BLACK);
+                    c.setFont(new Font("Arial", Font.BOLD, 14));
+                }
+                return c;
+            }
+        });
+
+        // Renderer cho trạng thái, ưu tiên
         table.getColumnModel().getColumn(4).setCellRenderer(new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                 String status = (String) value;
-                if ("✓".equals(status)) {
-                    c.setForeground(new Color(0, 128, 0)); // xanh lá
-                } else {
-                    c.setForeground(Color.RED);
-                }
+                if ("✓".equals(status)) c.setForeground(new Color(0, 128, 0));
+                else c.setForeground(Color.RED);
                 return c;
             }
         });
@@ -74,20 +87,16 @@ public class GiaoDienChinh extends JFrame {
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                 String priority = (String) value;
-                if (priority != null && priority.toLowerCase().contains("cao")) {
-                    c.setForeground(Color.RED);
-                } else if (priority != null && priority.toLowerCase().contains("trung bình")) {
-                    c.setForeground(new Color(255, 140, 0)); // cam
-                } else {
-                    c.setForeground(new Color(0, 128, 0)); // xanh
-                }
+                if (priority != null && priority.toLowerCase().contains("cao")) c.setForeground(Color.RED);
+                else if (priority != null && priority.toLowerCase().contains("trung bình")) c.setForeground(new Color(255, 140, 0));
+                else c.setForeground(new Color(0, 128, 0));
                 return c;
             }
         });
 
         // Panel nút chức năng
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        btnThem = new JButton("Thêm công việc");
+        btnThem = new JButton("Thêm công việc chính");
         btnXoa = new JButton("Xóa công việc");
         btnLuu = new JButton("Lưu tất cả");
         buttonPanel.add(btnThem);
@@ -104,22 +113,22 @@ public class GiaoDienChinh extends JFrame {
         gbc.gridx = 0; gbc.gridy = 3; gbc.weightx = 1; gbc.weighty = 1; gbc.gridwidth = 2; gbc.fill = GridBagConstraints.BOTH;
         add(scrollPane, gbc);
 
-        // Sự kiện cho bộ lọc trạng thái
+        // Bộ lọc trạng thái
         chkHoanThanh.addActionListener(e -> capNhatBang());
         chkChuaHoanThanh.addActionListener(e -> capNhatBang());
 
-        // Sự kiện cho nút Thêm
+        // Nút thêm task chính
         btnThem.addActionListener(e -> {
             CongViecDialog dialog = new CongViecDialog(this, null);
             dialog.setVisible(true);
             if (dialog.isConfirmed()) {
                 CongViec cv = dialog.getCongViec();
-                ql.themCongViec(cv);
-                tableModel.fireTableDataChanged();
+                ql.getDanhSach().add(cv);
+                tableModel.updateFlattened();
             }
         });
 
-        // Sự kiện cho nút Xóa
+        // Nút xóa task (chỉ xóa task chính/subtask được chọn)
         btnXoa.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row == -1) {
@@ -127,62 +136,155 @@ public class GiaoDienChinh extends JFrame {
                 return;
             }
             int modelRow = table.convertRowIndexToModel(row);
-            int confirm = JOptionPane.showConfirmDialog(this, "Bạn có chắc muốn xóa công việc này?", "Xác nhận xóa", JOptionPane.YES_NO_OPTION);
-            if (confirm == JOptionPane.YES_OPTION) {
-                ql.xoaCongViec(modelRow);
-                tableModel.fireTableDataChanged();
+            CongViecTableModel.RowItem item = tableModel.getRowItemAt(modelRow);
+            if (item == null) {
+                JOptionPane.showMessageDialog(this, "Không tìm thấy công việc cần xóa!");
+                return;
+            }
+            CongViec cv = item.task;
+            if (item.level == 0) {
+                // Task cha: xóa luôn cả subtask (sẽ hỏi xác nhận)
+                int confirm = JOptionPane.showConfirmDialog(this, "Xóa công việc này và toàn bộ công việc con?", "Xác nhận xóa", JOptionPane.YES_NO_OPTION);
+                if (confirm == JOptionPane.YES_OPTION) {
+                    ql.getDanhSach().remove(cv);
+                    tableModel.updateFlattened();
+                }
+            } else {
+                // Subtask: xóa khỏi task cha
+                for (CongViec cha : ql.getDanhSach()) {
+                    if (cha.getSubTasks().contains(cv)) {
+                        cha.getSubTasks().remove(cv);
+                        break;
+                    }
+                }
+                tableModel.updateFlattened();
             }
         });
 
-        // Sự kiện cho nút Lưu
+        // Nút lưu
         btnLuu.addActionListener(e -> {
             ql.luuVaoFile();
             JOptionPane.showMessageDialog(this, "Đã lưu tất cả công việc!");
         });
 
-        // Sự kiện double-click để sửa
+        // Sự kiện tìm kiếm
+        btnTimKiem.addActionListener(e -> timKiemCongViec());
+
+        // Chuột phải: thêm subtask cho task cha
+        JPopupMenu menu = new JPopupMenu();
+        JMenuItem itemAddSub = new JMenuItem("Thêm công việc con");
+        menu.add(itemAddSub);
+
         table.addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseClicked(MouseEvent e) {
-                int row = table.getSelectedRow();
-                if (e.getClickCount() == 2 && row != -1) {
-                    int modelRow = table.convertRowIndexToModel(row);
-                    CongViec oldCv = ql.getDanhSach().get(modelRow);
-                    CongViecDialog dialog = new CongViecDialog(GiaoDienChinh.this, oldCv);
-                    dialog.setVisible(true);
-                    if (dialog.isConfirmed()) {
-                        CongViec newCv = dialog.getCongViec();
-                        ql.getDanhSach().set(modelRow, newCv);
-                        tableModel.fireTableDataChanged();
+            public void mousePressed(MouseEvent e) {
+                handlePopup(e);
+            }
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                handlePopup(e);
+            }
+            private void handlePopup(MouseEvent e) {
+                if (e.isPopupTrigger()) {
+                    int row = table.rowAtPoint(e.getPoint());
+                    if (row != -1) {
+                        table.setRowSelectionInterval(row, row);
+                        int modelRow = table.convertRowIndexToModel(row);
+                        CongViecTableModel.RowItem item = tableModel.getRowItemAt(modelRow);
+                        if (item != null && item.level == 0) { // Chỉ task cha mới thêm subtask
+                            menu.show(table, e.getX(), e.getY());
+                            itemAddSub.putClientProperty("parentTask", item.task);
+                        }
                     }
                 }
             }
         });
 
-        // Sự kiện tìm kiếm
-        btnTimKiem.addActionListener(e -> timKiemCongViec());
+        itemAddSub.addActionListener(e -> {
+            CongViec cha = (CongViec) itemAddSub.getClientProperty("parentTask");
+            if (cha != null) {
+                CongViecDialog dialog = new CongViecDialog(this, null);
+                dialog.setTitle("Thêm công việc con");
+                dialog.setVisible(true);
+                if (dialog.isConfirmed()) {
+                    CongViec sub = dialog.getCongViec();
+                    cha.addSubTask(sub);
+                    cha.setExpanded(true); // Tự động expand
+                    tableModel.updateFlattened();
+                }
+            }
+        });
+
+        // Sự kiện click expand/collapse
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int row = table.rowAtPoint(e.getPoint());
+                int col = table.columnAtPoint(e.getPoint());
+
+                // Cột đầu expand/collapse
+                if (col == 0 && row != -1) {
+                    int modelRow = table.convertRowIndexToModel(row);
+                    CongViecTableModel.RowItem item = tableModel.getRowItemAt(modelRow);
+                    if (item != null && item.level == 0 && item.task.getSubTasks().size() > 0) {
+                        item.task.setExpanded(!item.task.isExpanded());
+                        tableModel.updateFlattened();
+                    }
+                    return;
+                }
+
+                // Double click để sửa (task chính/subtask)
+                if (e.getClickCount() == 2 && row != -1 && col != 0) {
+                    int modelRow = table.convertRowIndexToModel(row);
+                    CongViecTableModel.RowItem item = tableModel.getRowItemAt(modelRow);
+                    if (item != null) {
+                        CongViec oldCv = item.task;
+                        CongViecDialog dialog = new CongViecDialog(GiaoDienChinh.this, oldCv);
+                        dialog.setVisible(true);
+                        if (dialog.isConfirmed()) {
+                            CongViec newCv = dialog.getCongViec();
+                            // Copy dữ liệu vào object cũ
+                            oldCv.setTieuDe(newCv.getTieuDe());
+                            oldCv.setMoTa(newCv.getMoTa());
+                            oldCv.setHanChot(newCv.getHanChot());
+                            oldCv.setHoanThanh(newCv.isHoanThanh());
+                            oldCv.setUuTien(newCv.getUuTien());
+                            oldCv.setNguoiThucHien(newCv.getNguoiThucHien());
+                            oldCv.setGhiChu(newCv.getGhiChu());
+                            oldCv.setDuongDan(newCv.getDuongDan());
+                            tableModel.updateFlattened();
+                        }
+                    }
+                }
+            }
+        });
 
         capNhatBang();
     }
 
     private void capNhatBang() {
         List<CongViec> danhSach = ql.getDanhSach();
-        tableModel.setDanhSach(danhSach.stream().filter(cv ->
-            (chkHoanThanh.isSelected() && cv.isHoanThanh()) ||
-            (chkChuaHoanThanh.isSelected() && !cv.isHoanThanh())
-        ).collect(Collectors.toList()));
+        // Lọc theo trạng thái, chỉ ở danh sách gốc (task cha)
+        List<CongViec> filtered = danhSach.stream()
+            .filter(cv -> (chkHoanThanh.isSelected() && cv.isHoanThanh()) ||
+                          (chkChuaHoanThanh.isSelected() && !cv.isHoanThanh()))
+            .collect(Collectors.toList());
+        tableModel.setDanhSachGoc(filtered);
     }
 
     private void timKiemCongViec() {
         String tuKhoa = txtTimKiem.getText().trim().toLowerCase();
-        List<CongViec> ketQua = ql.getDanhSach().stream().filter(cv ->
-            cv.getTieuDe().toLowerCase().contains(tuKhoa) ||
-            cv.getMoTa().toLowerCase().contains(tuKhoa) ||
-            cv.getNguoiThucHien().toLowerCase().contains(tuKhoa) ||
-            cv.getUuTien().toLowerCase().contains(tuKhoa) ||
-            cv.getGhiChu().toLowerCase().contains(tuKhoa)
-        ).collect(Collectors.toList());
-        tableModel.setDanhSach(ketQua);
+        List<CongViec> ketQua = ql.getDanhSach().stream()
+            .filter(cv -> 
+                cv.getTieuDe().toLowerCase().contains(tuKhoa) ||
+                cv.getMoTa().toLowerCase().contains(tuKhoa) ||
+                cv.getNguoiThucHien().toLowerCase().contains(tuKhoa) ||
+                cv.getUuTien().toLowerCase().contains(tuKhoa) ||
+                cv.getGhiChu().toLowerCase().contains(tuKhoa) ||
+                (cv.getDuongDan() != null && cv.getDuongDan().toLowerCase().contains(tuKhoa))
+            )
+            .collect(Collectors.toList());
+        tableModel.setDanhSachGoc(ketQua);
     }
 
     public static void main(String[] args) {
@@ -191,3 +293,4 @@ public class GiaoDienChinh extends JFrame {
         });
     }
 }
+

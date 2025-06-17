@@ -5,7 +5,7 @@ import java.awt.*;
 import java.awt.event.*;
 
 public class CongViecDialog extends JDialog {
-    private JTextField txtTieuDe, txtMoTa, txtHanChot, txtUuTien, txtNguoiThucHien, txtGhiChu;
+    private JTextField txtTieuDe, txtMoTa, txtHanChot, txtUuTien, txtNguoiThucHien, txtGhiChu, txtDuongDan;
     private JCheckBox chkHoanThanh;
     private boolean confirmed = false;
     private CongViec congViec;
@@ -13,54 +13,84 @@ public class CongViecDialog extends JDialog {
     public CongViecDialog(Frame parent, CongViec congViec) {
         super(parent, true);
         setTitle(congViec == null ? "Thêm công việc" : "Sửa công việc");
-        setSize(400, 400);
+        setSize(460, 430);
         setLocationRelativeTo(parent);
-        setLayout(new GridBagLayout());
+
+        JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.insets = new Insets(7, 7, 7, 7);
+        gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 0;
 
-        gbc.gridx = 0; gbc.gridy = 0;
-        add(new JLabel("Tiêu đề:"), gbc);
-        gbc.gridx = 1;
-        txtTieuDe = new JTextField(20);
-        add(txtTieuDe, gbc);
+        int row = 0;
 
-        gbc.gridx = 0; gbc.gridy++;
-        add(new JLabel("Mô tả:"), gbc);
-        gbc.gridx = 1;
-        txtMoTa = new JTextField(20);
-        add(txtMoTa, gbc);
+        // Tiêu đề
+        gbc.gridx = 0; gbc.gridy = row;
+        panel.add(new JLabel("Tiêu đề:"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        txtTieuDe = new JTextField();
+        panel.add(txtTieuDe, gbc);
 
-        gbc.gridx = 0; gbc.gridy++;
-        add(new JLabel("Hạn chót (dd/MM/yyyy):"), gbc);
-        gbc.gridx = 1;
-        txtHanChot = new JTextField(20);
-        add(txtHanChot, gbc);
+        // Mô tả
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        panel.add(new JLabel("Mô tả:"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        txtMoTa = new JTextField();
+        panel.add(txtMoTa, gbc);
 
-        gbc.gridx = 0; gbc.gridy++;
-        add(new JLabel("Ưu tiên:"), gbc);
-        gbc.gridx = 1;
-        txtUuTien = new JTextField(20);
-        add(txtUuTien, gbc);
+        // Hạn chót
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        panel.add(new JLabel("Hạn chót (dd/MM/yyyy):"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        txtHanChot = new JTextField();
+        panel.add(txtHanChot, gbc);
 
-        gbc.gridx = 0; gbc.gridy++;
-        add(new JLabel("Người thực hiện:"), gbc);
-        gbc.gridx = 1;
-        txtNguoiThucHien = new JTextField(20);
-        add(txtNguoiThucHien, gbc);
+        // Ưu tiên
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        panel.add(new JLabel("Ưu tiên:"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        txtUuTien = new JTextField();
+        panel.add(txtUuTien, gbc);
 
-        gbc.gridx = 0; gbc.gridy++;
-        add(new JLabel("Ghi chú:"), gbc);
-        gbc.gridx = 1;
-        txtGhiChu = new JTextField(20);
-        add(txtGhiChu, gbc);
+        // Người thực hiện
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        panel.add(new JLabel("Người thực hiện:"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        txtNguoiThucHien = new JTextField();
+        panel.add(txtNguoiThucHien, gbc);
 
-        gbc.gridx = 0; gbc.gridy++;
-        add(new JLabel("Đã hoàn thành:"), gbc);
-        gbc.gridx = 1;
+        // Ghi chú
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        panel.add(new JLabel("Ghi chú:"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        txtGhiChu = new JTextField();
+        panel.add(txtGhiChu, gbc);
+
+        // Đường dẫn (file/link)
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        panel.add(new JLabel("Đường dẫn (file/link):"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
+        txtDuongDan = new JTextField();
+        panel.add(txtDuongDan, gbc);
+        gbc.gridx = 2; gbc.weightx = 0;
+        JButton btnChonFile = new JButton("Chọn...");
+        panel.add(btnChonFile, gbc);
+
+        btnChonFile.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+            if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+                txtDuongDan.setText(chooser.getSelectedFile().getAbsolutePath());
+            }
+        });
+
+        // Đã hoàn thành
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
+        panel.add(new JLabel("Đã hoàn thành:"), gbc);
+        gbc.gridx = 1; gbc.weightx = 1.0;
         chkHoanThanh = new JCheckBox();
-        add(chkHoanThanh, gbc);
+        panel.add(chkHoanThanh, gbc);
 
         // Nút xác nhận và hủy
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
@@ -68,10 +98,12 @@ public class CongViecDialog extends JDialog {
         JButton btnCancel = new JButton("Hủy");
         buttonPanel.add(btnOK);
         buttonPanel.add(btnCancel);
-        gbc.gridx = 0; gbc.gridy++; gbc.gridwidth = 2;
-        add(buttonPanel, gbc);
 
-        // Nếu sửa thì load dữ liệu lên form
+        row++; gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 3;
+        gbc.weightx = 1.0;
+        panel.add(buttonPanel, gbc);
+
+        // Load dữ liệu lên form nếu sửa
         if (congViec != null) {
             txtTieuDe.setText(congViec.getTieuDe());
             txtMoTa.setText(congViec.getMoTa());
@@ -80,6 +112,7 @@ public class CongViecDialog extends JDialog {
             txtNguoiThucHien.setText(congViec.getNguoiThucHien());
             txtGhiChu.setText(congViec.getGhiChu());
             chkHoanThanh.setSelected(congViec.isHoanThanh());
+            txtDuongDan.setText(congViec.getDuongDan());
         }
 
         btnOK.addActionListener(e -> {
@@ -95,7 +128,8 @@ public class CongViecDialog extends JDialog {
                 chkHoanThanh.isSelected(),
                 txtUuTien.getText().trim(),
                 txtNguoiThucHien.getText().trim(),
-                txtGhiChu.getText().trim()
+                txtGhiChu.getText().trim(),
+                txtDuongDan.getText().trim()
             );
             dispose();
         });
@@ -103,6 +137,8 @@ public class CongViecDialog extends JDialog {
             confirmed = false;
             dispose();
         });
+
+        setContentPane(panel);
     }
 
     public boolean isConfirmed() {
@@ -112,4 +148,5 @@ public class CongViecDialog extends JDialog {
     public CongViec getCongViec() {
         return congViec;
     }
-} 
+}
+
