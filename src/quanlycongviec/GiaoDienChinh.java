@@ -2,6 +2,7 @@ package quanlycongviec;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableCellEditor;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
@@ -10,11 +11,19 @@ import java.util.stream.Collectors;
 
 public class GiaoDienChinh extends JFrame {
     private QuanLyCongViec ql;
+    private QuanLyLichHop qlLichHop;
     private JTable table;
+    private JTable tableLichHop;
     private CongViecTableModel tableModel;
+    private LichHopTableModel lichHopTableModel;
     private JTextField txtTimKiem;
+    private JTextField txtTimKiemLichHop;
     private JButton btnThem, btnXoa, btnLuu, btnTimKiem;
+    private JButton btnThemLichHop, btnXoaLichHop, btnTimKiemLichHop;
     private JCheckBox chkHoanThanh, chkChuaHoanThanh;
+    private JTabbedPane tabbedPane;
+    private JCheckBox chkChiHienThiSapToi;
+    private JComboBox<String> cboNguoiThamDu;
 
     // --- Tông màu văn phòng nhã nhặn ---
     private static final Color PRIMARY_COLOR = new Color(33, 37, 41); // text đen/xám đậm
@@ -35,16 +44,37 @@ public class GiaoDienChinh extends JFrame {
 
     public GiaoDienChinh() {
         ql = new QuanLyCongViec();
-        setTitle("Quản Lý Công Việc");
+        qlLichHop = new QuanLyLichHop();
+        lichHopTableModel = new LichHopTableModel();
+        lichHopTableModel.setDanhSach(qlLichHop.getDanhSach());
+        setTitle("Quản Lý Công Việc & Lịch Họp");
         setSize(1200, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setBackground(BACKGROUND_COLOR);
 
-        // Main panel with padding
-        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
-        mainPanel.setBackground(BACKGROUND_COLOR);
-        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        // Tạo tabbed pane
+        tabbedPane = new JTabbedPane();
+        tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        
+        // Tab Quản lý công việc
+        JPanel tabCongViec = createTabCongViec();
+        tabbedPane.addTab("Quản lý công việc", tabCongViec);
+        
+        // Tab Quản lý lịch họp
+        JPanel tabLichHop = createTabLichHop();
+        tabbedPane.addTab("Quản lý lịch họp", tabLichHop);
+        
+        add(tabbedPane);
+        
+        capNhatBang();
+        capNhatBangLichHop();
+    }
+
+    private JPanel createTabCongViec() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBackground(BACKGROUND_COLOR);
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
 
         // Gộp các panel trên vào một panel dọc
         JPanel topGroupPanel = new JPanel();
@@ -102,14 +132,175 @@ public class GiaoDienChinh extends JFrame {
         table.setSelectionBackground(TABLE_ROW_SELECTED);
         table.setSelectionForeground(PRIMARY_COLOR);
 
+        // Thêm renderer cho các cột cần xuống dòng
+        for (int i = 0; i < table.getColumnCount(); i++) {
+            if (i == 1 || i == 3 || i == 6 || i == 7) { // Tiêu đề, Mô tả, Người thực hiện, Ghi chú
+                table.getColumnModel().getColumn(i).setCellRenderer(new MultiLineCellRenderer());
+                table.getColumnModel().getColumn(i).setCellEditor(new MultiLineCellEditor());
+            }
+        }
+
         JScrollPane scrollPane = new JScrollPane(table);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.getViewport().setBackground(PANEL_BACKGROUND);
 
-        mainPanel.add(topGroupPanel, BorderLayout.NORTH);
-        mainPanel.add(scrollPane, BorderLayout.CENTER);
-        add(mainPanel);
+        panel.add(topGroupPanel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
 
+        // Thêm các event listener
+        setupCongViecEventListeners();
+
+        return panel;
+    }
+
+    private JPanel createTabLichHop() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBackground(BACKGROUND_COLOR);
+        
+        // Panel tìm kiếm và lọc
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchPanel.setBackground(PANEL_BACKGROUND);
+        
+        JTextField txtTimKiem = new JTextField(20);
+        txtTimKiem.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        
+        JButton btnTimKiem = new JButton("Tìm kiếm");
+        btnTimKiem.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        btnTimKiem.setBackground(PRIMARY_COLOR);
+        btnTimKiem.setForeground(Color.WHITE);
+        
+        JCheckBox chkChiHienThiSapToi = new JCheckBox("Chỉ hiển thị lịch sắp tới");
+        chkChiHienThiSapToi.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        chkChiHienThiSapToi.setBackground(PANEL_BACKGROUND);
+        
+        JComboBox<String> cboNguoiThamDu = new JComboBox<>(new String[]{"Tất cả người tham dự", "Nguyễn Văn A", "Trần Thị B", "Lê Văn C"});
+        cboNguoiThamDu.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        
+        searchPanel.add(new JLabel("Tìm kiếm:"));
+        searchPanel.add(txtTimKiem);
+        searchPanel.add(btnTimKiem);
+        searchPanel.add(Box.createHorizontalStrut(20));
+        searchPanel.add(chkChiHienThiSapToi);
+        searchPanel.add(Box.createHorizontalStrut(20));
+        searchPanel.add(new JLabel("Người tham dự:"));
+        searchPanel.add(cboNguoiThamDu);
+        
+        // Panel nút
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.setBackground(PANEL_BACKGROUND);
+        
+        JButton btnThem = new JButton("Thêm lịch họp");
+        JButton btnXoa = new JButton("Xóa lịch họp");
+        
+        btnThem.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        btnXoa.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        
+        btnThem.setBackground(PRIMARY_COLOR);
+        btnXoa.setBackground(PRIMARY_COLOR);
+        
+        btnThem.setForeground(Color.WHITE);
+        btnXoa.setForeground(Color.WHITE);
+        
+        buttonPanel.add(btnThem);
+        buttonPanel.add(btnXoa);
+        
+        // Bảng lịch họp
+        tableLichHop = new JTable(lichHopTableModel);
+        tableLichHop.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        tableLichHop.setRowHeight(35);
+        tableLichHop.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tableLichHop.setShowGrid(false);
+        tableLichHop.setIntercellSpacing(new Dimension(0, 0));
+        
+        // Khởi tạo dữ liệu cho bảng
+        capNhatBangLichHop();
+        
+        // Thiết lập renderer cho các cột
+        if (tableLichHop.getColumnCount() > 0) {
+            MultiLineCellRenderer renderer = new MultiLineCellRenderer();
+            tableLichHop.getColumnModel().getColumn(1).setCellRenderer(renderer); // Tên họp
+            tableLichHop.getColumnModel().getColumn(5).setCellRenderer(renderer); // Nội dung
+            tableLichHop.getColumnModel().getColumn(6).setCellRenderer(renderer); // Người tham dự
+            
+            // Thiết lập renderer cho cột trạng thái
+            tableLichHop.getColumnModel().getColumn(7).setCellRenderer(new DefaultTableCellRenderer() {
+                @Override
+                public Component getTableCellRendererComponent(JTable table, Object value,
+                        boolean isSelected, boolean hasFocus, int row, int column) {
+                    Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                    
+                    if (value != null) {
+                        String status = value.toString();
+                        if (status.equals("Đã diễn ra")) {
+                            c.setForeground(new Color(128, 128, 128)); // Màu xám
+                        } else if (status.equals("Đang diễn ra")) {
+                            c.setForeground(new Color(0, 128, 0)); // Màu xanh lá
+                        } else if (status.equals("Sắp diễn ra")) {
+                            c.setForeground(new Color(255, 165, 0)); // Màu cam
+                        }
+                    }
+                    
+                    return c;
+                }
+            });
+        }
+        
+        JScrollPane scrollPane = new JScrollPane(tableLichHop);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        
+        // Thêm các panel vào tab
+        panel.add(searchPanel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+        
+        // Thêm sự kiện
+        btnThem.addActionListener(e -> themLichHop());
+        btnXoa.addActionListener(e -> xoaLichHop());
+        
+        btnTimKiem.addActionListener(e -> {
+            String tuKhoa = txtTimKiem.getText().trim();
+            if (!tuKhoa.isEmpty()) {
+                List<LichHop> ketQua = qlLichHop.timKiem(tuKhoa);
+                lichHopTableModel.setDanhSach(ketQua);
+            } else {
+                capNhatBangLichHop();
+            }
+        });
+        
+        chkChiHienThiSapToi.addActionListener(e -> {
+            boolean chiHienThiSapToi = chkChiHienThiSapToi.isSelected();
+            List<LichHop> ketQua = qlLichHop.locTheoThoiGian(chiHienThiSapToi);
+            lichHopTableModel.setDanhSach(ketQua);
+        });
+        
+        cboNguoiThamDu.addActionListener(e -> {
+            String nguoiThamDu = cboNguoiThamDu.getSelectedItem().toString();
+            if (!nguoiThamDu.equals("Tất cả người tham dự")) {
+                List<LichHop> ketQua = qlLichHop.locTheoNguoiThamDu(nguoiThamDu);
+                lichHopTableModel.setDanhSach(ketQua);
+            } else {
+                capNhatBangLichHop();
+            }
+        });
+        
+        // Thêm sự kiện double click để sửa
+        tableLichHop.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int row = tableLichHop.getSelectedRow();
+                    if (row != -1) {
+                        suaLichHop(row);
+                    }
+                }
+            }
+        });
+        
+        tabbedPane.addTab("Quản lý lịch họp", panel);
+        return panel;
+    }
+
+    private void setupCongViecEventListeners() {
         // Bộ lọc trạng thái
         chkHoanThanh.addActionListener(e -> capNhatBang());
         chkChuaHoanThanh.addActionListener(e -> capNhatBang());
@@ -126,7 +317,7 @@ public class GiaoDienChinh extends JFrame {
             }
         });
 
-        // Nút xóa task (chỉ xóa task chính/subtask được chọn)
+        // Nút xóa task
         btnXoa.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row == -1) {
@@ -147,7 +338,6 @@ public class GiaoDienChinh extends JFrame {
                     capNhatBang();
                 }
             } else {
-                // Subtask: xóa khỏi DB bằng id
                 ql.xoaCongViec(cv.getId());
                 capNhatBang();
             }
@@ -162,124 +352,94 @@ public class GiaoDienChinh extends JFrame {
         // Sự kiện tìm kiếm
         btnTimKiem.addActionListener(e -> timKiemCongViec());
 
-        // Chuột phải: thêm subtask cho task cha
-        JPopupMenu menu = new JPopupMenu();
-        JMenuItem itemAddSub = new JMenuItem("Thêm công việc con");
-        menu.add(itemAddSub);
-
-        table.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                handlePopup(e);
-            }
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                handlePopup(e);
-            }
-            private void handlePopup(MouseEvent e) {
-                if (e.isPopupTrigger()) {
-                    int row = table.rowAtPoint(e.getPoint());
-                    if (row != -1) {
-                        table.setRowSelectionInterval(row, row);
-                        int modelRow = table.convertRowIndexToModel(row);
-                        CongViecTableModel.RowItem item = tableModel.getRowItemAt(modelRow);
-                        if (item != null && item.level == 0) { // Chỉ task cha mới thêm subtask
-                            menu.show(table, e.getX(), e.getY());
-                            itemAddSub.putClientProperty("parentTask", item.task);
-                        }
-                    }
-                }
-            }
-        });
-
-        itemAddSub.addActionListener(e -> {
-            CongViec cha = (CongViec) itemAddSub.getClientProperty("parentTask");
-            if (cha != null) {
-                CongViecDialog dialog = new CongViecDialog(this, null);
-                dialog.setTitle("Thêm công việc con");
-                dialog.setVisible(true);
-                if (dialog.isConfirmed()) {
-                    CongViec sub = dialog.getCongViec();
-                    sub.setSubTask(true);  // Đánh dấu là subtask
-                    int newId = ql.themSubTask(sub, cha.getId());
-                    sub.setId(newId);
-                    cha.setExpanded(true);  // Mở rộng công việc cha
-                    capNhatBang();
-                }
-            }
-        });
-
-        // Sự kiện click expand/collapse
+        // Double click để sửa
         table.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                int row = table.rowAtPoint(e.getPoint());
-                int col = table.columnAtPoint(e.getPoint());
-
-                // Cột đầu expand/collapse
-                if (col == 0 && row != -1) {
-                    int modelRow = table.convertRowIndexToModel(row);
-                    CongViecTableModel.RowItem item = tableModel.getRowItemAt(modelRow);
-                    if (item != null && item.level == 0 && item.task.getSubTasks().size() > 0) {
-                        item.task.setExpanded(!item.task.isExpanded());
-                        tableModel.updateFlattened();
-                    }
-                    return;
-                }
-
-                // Xử lý click vào cột Đường dẫn
-                if (col == 8 && row != -1) {
-                    int modelRow = table.convertRowIndexToModel(row);
-                    CongViecTableModel.RowItem item = tableModel.getRowItemAt(modelRow);
-                    if (item != null) {
-                        String path = item.task.getDuongDan();
-                        if (path != null && !path.isEmpty()) {
-                            try {
-                                File file = new File(path);
-                                File folderToOpen = file.isDirectory() ? file : file.getParentFile();
-                                if (folderToOpen != null && folderToOpen.exists()) {
-                                    String os = System.getProperty("os.name").toLowerCase();
-                                    if (os.contains("linux")) {
-                                        Runtime.getRuntime().exec(new String[]{"xdg-open", folderToOpen.getAbsolutePath()});
-                                    } else if (os.contains("win")) {
-                                        Runtime.getRuntime().exec(new String[]{"explorer", folderToOpen.getAbsolutePath()});
-                                    } else if (os.contains("mac")) {
-                                        Runtime.getRuntime().exec(new String[]{"open", folderToOpen.getAbsolutePath()});
-                                    }
-                                } else {
-                                    JOptionPane.showMessageDialog(GiaoDienChinh.this, "Đường dẫn không tồn tại!");
-                                }
-                            } catch (Exception ex) {
-                                JOptionPane.showMessageDialog(GiaoDienChinh.this, "Không thể mở thư mục: " + ex.getMessage());
+                if (e.getClickCount() == 2) {
+                    int row = table.getSelectedRow();
+                    if (row != -1) {
+                        int modelRow = table.convertRowIndexToModel(row);
+                        CongViecTableModel.RowItem item = tableModel.getRowItemAt(modelRow);
+                        if (item != null) {
+                            CongViec oldCv = item.task;
+                            CongViecDialog dialog = new CongViecDialog(GiaoDienChinh.this, oldCv);
+                            dialog.setVisible(true);
+                            if (dialog.isConfirmed()) {
+                                CongViec newCv = dialog.getCongViec();
+                                ql.capNhatCongViec(oldCv.getId(), newCv);
+                                capNhatBang();
                             }
-                        }
-                    }
-                    return;
-                }
-
-                // Double click để sửa (task chính/subtask)
-                if (e.getClickCount() == 2 && row != -1 && col != 0) {
-                    int modelRow = table.convertRowIndexToModel(row);
-                    CongViecTableModel.RowItem item = tableModel.getRowItemAt(modelRow);
-                    if (item != null) {
-                        CongViec oldCv = item.task;
-                        CongViecDialog dialog = new CongViecDialog(GiaoDienChinh.this, oldCv);
-                        dialog.setVisible(true);
-                        if (dialog.isConfirmed()) {
-                            CongViec newCv = dialog.getCongViec();
-                            // Cập nhật vào DB
-                            ql.capNhatCongViec(oldCv.getId(), newCv);
-                            capNhatBang();
                         }
                     }
                 }
             }
         });
+    }
 
-        // Add this line after table setup
-        setupTableRenderers();
-
-        capNhatBang();
+    private void themLichHop() {
+        LichHop lichHop = new LichHop();
+        LichHopDialog dialog = new LichHopDialog(this, lichHop, false);
+        dialog.setVisible(true);
+        
+        if (dialog.getLichHop() != null) {
+            qlLichHop.themLichHop(dialog.getLichHop());
+            capNhatBangLichHop();
+        }
+    }
+    
+    private void suaLichHop(int row) {
+        LichHop lichHop = lichHopTableModel.getLichHop(row);
+        LichHopDialog dialog = new LichHopDialog(this, lichHop, true);
+        dialog.setVisible(true);
+        
+        if (dialog.getLichHop() != null) {
+            qlLichHop.capNhatLichHop(dialog.getLichHop());
+            capNhatBangLichHop();
+        }
+    }
+    
+    private void xoaLichHop() {
+        int row = tableLichHop.getSelectedRow();
+        if (row == -1) {
+            JOptionPane.showMessageDialog(this, "Vui lòng chọn lịch họp cần xóa!", "Thông báo", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        int confirm = JOptionPane.showConfirmDialog(this, "Bạn có chắc chắn muốn xóa lịch họp này?", 
+                "Xác nhận xóa", JOptionPane.YES_NO_OPTION);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            LichHop lichHop = lichHopTableModel.getLichHop(row);
+            qlLichHop.xoaLichHop(lichHop.getId());
+            capNhatBangLichHop();
+        }
+    }
+    
+    private void capNhatBangLichHop() {
+        List<LichHop> danhSach = qlLichHop.getDanhSach();
+        
+        // Áp dụng filter thời gian nếu đang bật
+        if (chkChiHienThiSapToi != null && chkChiHienThiSapToi.isSelected()) {
+            danhSach = qlLichHop.locTheoThoiGian(true);
+        }
+        
+        // Áp dụng filter người tham dự nếu đã chọn
+        if (cboNguoiThamDu != null && cboNguoiThamDu.getSelectedIndex() > 0) {
+            String nguoiThamDu = cboNguoiThamDu.getSelectedItem().toString();
+            danhSach = qlLichHop.locTheoNguoiThamDu(nguoiThamDu);
+        }
+        
+        // Cập nhật TableModel
+        lichHopTableModel.setDanhSach(danhSach);
+        
+        // Thông báo nếu không có dữ liệu
+        if (danhSach.isEmpty()) {
+            JOptionPane.showMessageDialog(this, 
+                "Không có lịch họp nào thỏa mãn điều kiện lọc!", 
+                "Thông báo", 
+                JOptionPane.INFORMATION_MESSAGE);
+        }
     }
 
     private void capNhatBang() {
@@ -365,65 +525,166 @@ public class GiaoDienChinh extends JFrame {
     }
     // --------------------------------------
 
-    private void setupTableRenderers() {
-        // Renderer cho cột tiêu đề
-        table.getColumnModel().getColumn(1).setCellRenderer(new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                String text = (String) value;
-                if (text.startsWith("    ↳")) {
-                    c.setForeground(new Color(76, 175, 80)); // xanh lá nhạt cho subtask
-                    c.setFont(new Font("Segoe UI", Font.ITALIC, 14));
-                } else {
-                    c.setForeground(PRIMARY_COLOR);
-                    c.setFont(new Font("Segoe UI", Font.BOLD, 14));
-                }
-                if (isSelected) {
-                    c.setBackground(TABLE_ROW_SELECTED);
-                } else {
-                    c.setBackground(row % 2 == 0 ? TABLE_ROW_BG1 : TABLE_ROW_BG2);
-                }
-                return c;
+    // Thêm class MultiLineCellRenderer
+    private class MultiLineCellRenderer extends DefaultTableCellRenderer {
+        private JTextArea textArea;
+        private JPanel panel;
+        private static final int MIN_HEIGHT = 35;
+        private static final int MAX_HEIGHT = 200;
+        private static final int PADDING = 10;
+
+        public MultiLineCellRenderer() {
+            textArea = new JTextArea();
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+            textArea.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+            textArea.setBackground(PANEL_BACKGROUND);
+            textArea.setForeground(PRIMARY_COLOR);
+            textArea.setBorder(BorderFactory.createEmptyBorder(PADDING, PADDING, PADDING, PADDING));
+            textArea.setEditable(false);
+            textArea.setOpaque(true);
+
+            panel = new JPanel(new BorderLayout(0, 0));
+            panel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
+            panel.add(textArea, BorderLayout.CENTER);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                boolean isSelected, boolean hasFocus, int row, int column) {
+            // Xử lý giá trị null
+            String text = value != null ? value.toString() : "";
+            
+            // Thay thế \n bằng xuống dòng thực sự
+            text = text.replace("\\n", "\n");
+            
+            // Đặt text và tính toán chiều cao
+            textArea.setText(text);
+            
+            // Lấy độ rộng cột hiện tại
+            int width = table.getColumnModel().getColumn(column).getWidth() - PADDING * 2;
+            textArea.setSize(new Dimension(width, Short.MAX_VALUE));
+            
+            // Tính toán chiều cao cần thiết
+            int height = textArea.getPreferredSize().height;
+            height = Math.max(MIN_HEIGHT, Math.min(height, MAX_HEIGHT));
+            
+            // Điều chỉnh chiều cao dòng nếu cần
+            if (height > table.getRowHeight(row)) {
+                table.setRowHeight(row, height);
             }
-        });
-        // Renderer cho trạng thái
-        table.getColumnModel().getColumn(5).setCellRenderer(new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                String status = (String) value;
-                if ("✓".equals(status)) {
-                    c.setForeground(new Color(56, 142, 60)); // xanh lá nhạt
-                } else {
-                    c.setForeground(new Color(211, 47, 47)); // đỏ nhạt
+
+            // Điều chỉnh màu nền
+            Color bg = isSelected ? TABLE_ROW_SELECTED : (row % 2 == 0 ? TABLE_ROW_BG1 : TABLE_ROW_BG2);
+            textArea.setBackground(bg);
+            panel.setBackground(bg);
+
+            // Căn giữa nội dung theo chiều dọc
+            textArea.setAlignmentY(Component.CENTER_ALIGNMENT);
+            panel.setAlignmentY(Component.CENTER_ALIGNMENT);
+
+            return panel;
+        }
+    }
+
+    // Thêm class MultiLineCellEditor
+    private class MultiLineCellEditor extends AbstractCellEditor implements TableCellEditor {
+        private JTextArea textArea;
+        private JScrollPane scrollPane;
+        private JDialog dialog;
+        private JButton okButton;
+        private JButton cancelButton;
+        private String originalValue;
+        private boolean editing = false;
+
+        public MultiLineCellEditor() {
+            textArea = new JTextArea();
+            textArea.setLineWrap(true);
+            textArea.setWrapStyleWord(true);
+            textArea.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+            
+            scrollPane = new JScrollPane(textArea);
+            scrollPane.setPreferredSize(new Dimension(400, 200));
+
+            okButton = new JButton("OK");
+            cancelButton = new JButton("Hủy");
+
+            okButton.addActionListener(e -> {
+                editing = false;
+                dialog.dispose();
+                fireEditingStopped();
+            });
+
+            cancelButton.addActionListener(e -> {
+                textArea.setText(originalValue);
+                editing = false;
+                dialog.dispose();
+                fireEditingCanceled();
+            });
+
+            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            buttonPanel.add(okButton);
+            buttonPanel.add(cancelButton);
+
+            dialog = new JDialog();
+            dialog.setModal(true);
+            dialog.setLayout(new BorderLayout());
+            dialog.add(scrollPane, BorderLayout.CENTER);
+            dialog.add(buttonPanel, BorderLayout.SOUTH);
+            
+            // Thêm window listener để xử lý khi đóng dialog
+            dialog.addWindowListener(new WindowAdapter() {
+                @Override
+                public void windowClosing(WindowEvent e) {
+                    textArea.setText(originalValue);
+                    editing = false;
+                    fireEditingCanceled();
                 }
-                if (isSelected) {
-                    c.setBackground(TABLE_ROW_SELECTED);
-                } else {
-                    c.setBackground(row % 2 == 0 ? TABLE_ROW_BG1 : TABLE_ROW_BG2);
-                }
-                return c;
-            }
-        });
-        // Default renderer cho các cột khác
-        DefaultTableCellRenderer defaultRenderer = new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                c.setForeground(PRIMARY_COLOR);
-                if (isSelected) {
-                    c.setBackground(TABLE_ROW_SELECTED);
-                } else {
-                    c.setBackground(row % 2 == 0 ? TABLE_ROW_BG1 : TABLE_ROW_BG2);
-                }
-                return c;
-            }
-        };
-        for (int i = 0; i < table.getColumnCount(); i++) {
-            if (table.getColumnModel().getColumn(i).getCellRenderer() == null) {
-                table.getColumnModel().getColumn(i).setCellRenderer(defaultRenderer);
-            }
+            });
+        }
+
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value,
+                boolean isSelected, int row, int column) {
+            originalValue = value != null ? value.toString() : "";
+            // Thay thế \n bằng xuống dòng thực sự
+            originalValue = originalValue.replace("\\n", "\n");
+            textArea.setText(originalValue);
+            textArea.setCaretPosition(0);
+            editing = true;
+            
+            // Đặt vị trí dialog
+            Point p = table.getLocationOnScreen();
+            p.x += table.getCellRect(row, column, true).x;
+            p.y += table.getCellRect(row, column, true).y;
+            dialog.setLocation(p);
+            
+            dialog.pack();
+            dialog.setVisible(true);
+            
+            return textArea;
+        }
+
+        @Override
+        public Object getCellEditorValue() {
+            return textArea.getText();
+        }
+
+        @Override
+        public boolean stopCellEditing() {
+            if (!editing) return true;
+            editing = false;
+            dialog.dispose();
+            return super.stopCellEditing();
+        }
+
+        @Override
+        public void cancelCellEditing() {
+            if (!editing) return;
+            textArea.setText(originalValue);
+            editing = false;
+            dialog.dispose();
+            super.cancelCellEditing();
         }
     }
 
